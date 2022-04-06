@@ -27,6 +27,7 @@
                                 <filter>
                                     <artifact>*:*</artifact>
                                     <excludes>
+                                        <exclude>module-info.class</exclude>
                                         <exclude>META-INF/*.SF</exclude>
                                         <exclude>META-INF/*.DSA</exclude>
                                         <exclude>META-INF/*.RSA</exclude>
@@ -63,6 +64,12 @@
     </build>
 
     <dependencies>
+        <!-- AAS Controller -->
+        <dependency>
+            <groupId>net.catenax.edc.extensions</groupId>
+            <artifactId>aas-controller</artifactId>
+        </dependency>
+
         <!-- Config -->
         <dependency>
             <groupId>org.eclipse.dataspaceconnector</groupId>
@@ -172,13 +179,6 @@
             <!-- http-posts EndpointDataReference to configured external service -->
             <groupId>org.eclipse.dataspaceconnector</groupId>
             <artifactId>http-receiver</artifactId>
-        </dependency>
-
-        <!-- Other -->
-        <dependency>
-            <groupId>jakarta.ws.rs</groupId>
-            <artifactId>jakarta.ws.rs-api</artifactId>
-            <version>3.0.0</version>
         </dependency>
     </dependencies>
 
