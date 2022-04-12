@@ -1,5 +1,11 @@
 # EDC Test Cases
 
+## Feature: Connector Integration
+
+Scenario 'Connector uses IDS DAPS to provide its own identity'
+
+Scenario 'Connector uses 
+
 ## Feature: Data Management
 
 Scenario 'Data Provider creates a new asset with data address'
@@ -26,6 +32,7 @@ Scenario 'Data Provider creates a new contract offer'
 
 Scenario 'Data Provider creates a new contract offer for specific business partner'
 
+Scenario 'Data Consumer sends the data provider a counter offer'
 
 ## Feature: Data Catalog
 
