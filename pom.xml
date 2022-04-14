@@ -24,6 +24,7 @@
         <module>edc-extensions</module>
         <module>edc-controlplane</module>
         <module>edc-dataplane</module>
+        <module>edc-dataplane-fs-vault</module>
     </modules>
 
     <properties>

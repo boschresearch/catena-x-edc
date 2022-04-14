@@ -8,7 +8,7 @@ WORKDIR /build
 # JAVA build options - 512m is not enough
 ENV _JAVA_OPTIONS="-Xmx2048m"
 
-COPY . .
+COPY ./edc ./edc
 
 # to cache gradle distribution download
 ENV GRADLE_USER_HOME=/build/.gradle
@@ -17,43 +17,54 @@ RUN cd ./edc && ./gradlew --version
 # build EDC first
 RUN cd ./edc && ./gradlew ${MAVEN_OPTS} clean build publishToMavenLocal -x test
 
+COPY ./mvnw settings.xml pom.xml ./
+COPY ./.mvn ./.mvn
+
+COPY ./edc-extensions ./edc-extensions
+COPY ./edc-controlplane ./edc-controlplane
+COPY ./edc-dataplane ./edc-dataplane
+COPY ./edc-dataplane-fs-vault ./edc-dataplane-fs-vault
+
 RUN ./mvnw -pl .,edc-extensions/business-partner-validation -am package
 
-#  -Pwith-docker-image - of course not possible in the build container
-RUN ./mvnw -pl .,edc-controlplane/edc-controlplane-memory -am package
+# where we save to jar result to easier find them
+RUN mkdir /jars
 
-RUN find ./target
+# build edc-controlplane (memory) and copy result to /jars
+RUN ./mvnw -pl .,edc-controlplane/edc-controlplane-memory -am package
+RUN cp -a /build/edc-controlplane/edc-controlplane-memory/target/edc-controlplane-memory.jar /jars/
+# cosmosdb
+RUN ./mvnw -pl .,edc-controlplane/edc-controlplane-cosmosdb -am package
+RUN cp -a /build/edc-controlplane/edc-controlplane-cosmosdb/target/edc-controlplane-cosmosdb.jar /jars/
+# postgresql
+RUN ./mvnw -pl .,edc-controlplane/edc-controlplane-postgresql -am package
+RUN cp -a /build/edc-controlplane/edc-controlplane-postgresql/target/edc-controlplane-postgresql.jar /jars/
+
+# move upwards
+# build edc-controlplane (memory) without any azure dependencies. E.g. use filesystem-vault
+RUN ./mvnw -pl .,edc-controlplane/edc-controlplane-memory-fs-vault -am package
+RUN cp -a /build/edc-controlplane/edc-controlplane-memory-fs-vault/target/edc-controlplane-memory-fs-vault.jar /jars/
+
+
+# build edc-dataplane and copy result to /jars
+RUN ./mvnw -pl .,edc-dataplane -am package
+RUN cp -a /build/edc-dataplane/target/edc-dataplane.jar /jars/
+
+RUN ./mvnw -pl .,edc-dataplane-fs-vault -am package
+RUN cp -a /build/edc-dataplane-fs-vault/target/edc-dataplane-fs-vault.jar /jars/
+
+RUN find /jars
+
 # create default cert
 # TODO: can we use localhost.localdomain? Do we need an "email" as described in the Readme?
 RUN mkdir /certs
 RUN openssl req -newkey rsa:2048 -new -nodes -x509 -days 3650 -subj "/CN=localhost.localdomain" -keyout /certs/key.pem -out /certs/cert.pem
 # SECURITY: default password used!
 RUN openssl pkcs12 -inkey /certs/key.pem -in /certs/cert.pem -export -out /certs/cert.pfx -password pass:123456
-
+RUN find /certs
 
 FROM openjdk:11-jre-slim-buster
 ARG JAR
-ARG HTTP_PROXY
-
-ENV JAVA_TOOL_OPTIONS -agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:8090
-ENV SPRING_PROFILES_ACTIVE local,basic
-ENV IDSADAPTER_SERVICEURL http://registry-service:4243
-ENV IDSADAPTER_CONNECTORTYPE edc
-ENV IDSADAPTER_CONNECTORPROTOCOL http
-ENV IDSADAPTER_CONNECTORHOST provider-control-plane:9191
-ENV IDSADAPTER_CONNECTORURL http://provider-control-plane:9191
-ENV IDSADAPTER_CONNECTORUSER X-Api-Key
-ENV IDSADAPTER_CONNECTORPASSWORD 123456
-ENV AASPROXY_REGISTRYURL http://registry-service:4243
-ENV IDSADAPTER_ADAPTERURL http://provider-aas-service:4244
-ENV AASPROXY_WRAPPERURL http://api-wrapper:9191/api/service
-
-RUN if [[ -n "${HTTP_PROXY}"  ]]; then echo "Acquire::http::Proxy \"${HTTP_PROXY}\"" >> /etc/apt/apt.conf.d/proxy.conf; fi && \
-    if [[ -n "${HTTP_PROXY}" ]]; then echo "Acquire::https::Proxy \"${HTTP_PROXY}\"" >> /etc/apt/apt.conf.d/proxy.conf; fi && \
-    apt-get -y upgrade && \
-    apt-get -y update && \
-    apt-get -y install curl && \
-    if [[ -n "${HTTP_PROXY}"  ]]; then rm -f /etc/apt/apt.conf.d/proxy.conf; fi
 
 WORKDIR /app
 
@@ -69,16 +80,4 @@ EXPOSE 9191
 EXPOSE 8090
 
 ENTRYPOINT java \
-    -Didsadapter.serviceUrl=${IDSADAPTER_SERVICEURL}\
-    -Didsadapter.connectorType=${IDSADAPTER_CONNECTORTYPE}\
-    -Didsadapter.connectorProtocol=${IDSADAPTER_CONNECTORPROTOCOL}\
-    -Didsadapter.connectorHost=${IDSADAPTER_CONNECTORHOST}\
-    -Didsadapter.connectorUrl=${IDSADAPTER_CONNECTORURL}\
-    -Didsadapter.connectorUser=${IDSADAPTER_CONNECTORUSER}\
-    -Didsadapter.connectorPassword=${IDSADAPTER_CONNECTORPASSWORD}\
-    -Didsadapter.adapterUrl=${IDSADAPTER_ADAPTERURL}\
-    -Dspring.profiles.active=${SPRING_PROFILES_ACTIVE}\
-    -Daasproxy.registryUrl=${AASPROXY_REGISTRYURL}\
-    -Daasproxy.wrapperUrl=${AASPROXY_WRAPPERURL}\
-    -Djava.security.edg=file:/dev/.urandom \
     -jar app.jar

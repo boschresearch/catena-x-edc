@@ -1,0 +1,36 @@
+version: "3.9"
+
+services:
+  provider-control-plane:
+    build:
+      context: .
+      dockerfile: ./docker/edc-controlplane/Dockerfile
+      args:
+        JAR: edc-controlplane-memory-fs-vault.jar
+    ports:
+      - "8181:9191" # default
+      - "8184:9192" # validation
+      - "5008:8090"
+    environment:
+      EDC_VAULT: /config/vault.properties
+      EDC_KEYSTORE: /certs/cert.pfx
+      EDC_KEYSTORE_PASSWORD: 123456
+      EDC_FS_CONFIG: /config/configuration.properties
+    volumes:
+      - ${PROVIDER_CONTROL_PLANE_VAULT_PROPERTIES_FILE:-./config/provider-control-plane/vault.properties}:/config/vault.properties
+      - ${PROVIDER_CONTROL_PLANE_CONFIGURATION_PROPERTIES_FILE:-./config/provider-control-plane/configuration.properties}:/config/configuration.properties
+
+  provider-data-plane:
+    build:
+      context: .
+      dockerfile: ./docker/edc-controlplane/Dockerfile
+      args:
+        JAR: edc-dataplane-fs-vault.jar
+    ports:
+      - "8182:9191" # default
+      - "8183:9192" # public
+      - "5009:8090"
+    environment:
+      EDC_FS_CONFIG: /config/configuration.properties
+    volumes:
+      - ${PROVIDER_DATA_PLANE_CONFIGURATION_PROPERTIES_FILE:-./config/provider-data-plane/configuration.properties}:/config/configuration.properties
